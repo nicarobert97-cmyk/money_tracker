@@ -324,6 +324,13 @@
         </div>
         <div class="section-body" id="catBreakdown"></div>
       </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Venituri pe categorii</span>
+        </div>
+        <div class="section-body" id="incBreakdown"></div>
+      </div>
     </div>
 
     <!-- Add tab -->
@@ -362,6 +369,18 @@
     <div class="tab-panel" id="tab-history">
       <div class="section" style="margin-top:0">
         <div class="section-header">
+          <span class="section-title">Sold inițial</span>
+        </div>
+        <div class="section-body" style="display:flex;align-items:center;gap:12px">
+          <input type="number" id="soldInitial" placeholder="0.00" min="0" step="0.01"
+            style="flex:1;background:#1a1a28;border:1px solid #2a2a3a;color:#f0ede8;padding:11px 14px;border-radius:10px;font-size:0.92rem;outline:none"
+            oninput="saveSoldInitial(this.value)"
+            onfocus="this.style.borderColor='#e8c97a'" onblur="this.style.borderColor='#2a2a3a'">
+          <span style="font-size:0.75rem;color:#555;min-width:80px">lei (sold la<br>1 Mart. 2026)</span>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header">
           <span class="section-title">Tranzacții</span>
           <span id="txCount" style="font-size:0.75rem;color:var(--muted)"></span>
         </div>
@@ -389,7 +408,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy }
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDoc, setDoc }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // =============================================
@@ -416,7 +435,8 @@ const CATEGORIES = {
   income: [
     { id:'salariu', name:'Salariu', icon:'💼', color:'#4ade80' },
     { id:'freelance', name:'Freelance', icon:'💻', color:'#60a5fa' },
-    { id:'investitii', name:'Investiții', icon:'📈', color:'#fbbf24' },
+    { id:'investitii_inc', name:'Investiții', icon:'📈', color:'#fbbf24' },
+    { id:'tichete', name:'Tichete de masă', icon:'🎫', color:'#34d399' },
     { id:'alte_venituri', name:'Alte venituri', icon:'💰', color:'#c084fc' },
   ],
   expense: [
@@ -428,7 +448,8 @@ const CATEGORIES = {
     { id:'imbracaminte', name:'Îmbrăcăminte', icon:'👗', color:'#f472b6' },
     { id:'educatie', name:'Educație', icon:'📚', color:'#38bdf8' },
     { id:'restaurant', name:'Restaurant & Cafele', icon:'☕', color:'#e07b5f' },
-    { id:'economii', name:'Economii', icon:'🏦', color:'#4ade80' },
+    { id:'investitii', name:'Investiții', icon:'📊', color:'#4ade80' },
+    { id:'rate', name:'Rate', icon:'🏦', color:'#f87171' },
     { id:'alte_chelt', name:'Altele', icon:'📦', color:'#94a3b8' },
   ]
 };
@@ -439,6 +460,7 @@ let unsubscribe = null;
 let viewYear = new Date().getFullYear();
 let viewMonth = new Date().getMonth();
 let currentType = 'expense';
+let soldInitial = 0;
 
 const getCat = (type, id) => CATEGORIES[type]?.find(c => c.id === id) || { name: id, icon:'📦', color:'#94a3b8' };
 const fmt = n => n.toLocaleString('ro-RO', { minimumFractionDigits:0, maximumFractionDigits:2 }) + ' lei';
@@ -485,8 +507,17 @@ window.signOut = async () => {
   }
 };
 
-function subscribeToData() {
+async function subscribeToData() {
   if (unsubscribe) unsubscribe();
+  // Load sold initial from Firestore
+  try {
+    const snap = await getDoc(doc(db, 'users', currentUser.uid, 'settings', 'general'));
+    if (snap.exists()) {
+      soldInitial = snap.data().soldInitial || 0;
+      const inp = document.getElementById('soldInitial');
+      if (inp) inp.value = soldInitial || '';
+    }
+  } catch(e) {}
   const ref = collection(db, 'users', currentUser.uid, 'transactions');
   const q = query(ref, orderBy('date', 'desc'));
   unsubscribe = onSnapshot(q, snap => {
@@ -557,6 +588,14 @@ window.switchTab = (tab, btn) => {
   else document.querySelectorAll('.tab-btn')[0].classList.add('active');
 };
 
+window.saveSoldInitial = async (val) => {
+  soldInitial = parseFloat(val) || 0;
+  try {
+    await setDoc(doc(db, 'users', currentUser.uid, 'settings', 'general'), { soldInitial });
+    render();
+  } catch(e) {}
+};
+
 function render() {
   const key = getMonthKey(viewYear, viewMonth);
   document.getElementById('monthLabel').textContent = `${MONTHS[viewMonth]} ${viewYear}`;
@@ -599,7 +638,7 @@ function render() {
       <div class="bar-label ${c.active?'active':''}">${c.label}</div>
     </div>`).join('');
 
-  // Categories
+  // Expense categories
   const catTotals = {};
   expenses.forEach(t => { catTotals[t.category] = (catTotals[t.category]||0)+t.amount; });
   const sortedCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
@@ -621,23 +660,61 @@ function render() {
     }).join('');
   }
 
-  // Transactions
+  // Income categories
+  const incTotals = {};
+  incomes.forEach(t => { incTotals[t.category] = (incTotals[t.category]||0)+t.amount; });
+  const sortedIncCats = Object.entries(incTotals).sort((a,b)=>b[1]-a[1]);
+  const incEl = document.getElementById('incBreakdown');
+  if (sortedIncCats.length === 0) {
+    incEl.innerHTML = '<div class="empty-cats">Niciun venit în această lună</div>';
+  } else {
+    incEl.innerHTML = sortedIncCats.map(([catId,amt]) => {
+      const cat = getCat('income', catId);
+      const pct = Math.round((amt/totalInc)*100);
+      const barW = Math.round((amt/sortedIncCats[0][1])*100);
+      return `<div class="cat-item">
+        <div class="cat-header">
+          <span class="cat-name">${cat.icon} ${cat.name}</span>
+          <span class="cat-amount" style="color:${cat.color}">${fmt(amt)} <span style="color:#555;font-weight:400">(${pct}%)</span></span>
+        </div>
+        <div class="cat-bar"><div class="cat-fill" style="width:${barW}%;background:${cat.color}"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // Transactions with sold ramas
   const txList = document.getElementById('txList');
   document.getElementById('txCount').textContent = `${monthTx.length} înregistrări`;
   if (monthTx.length === 0) {
     txList.innerHTML = `<div class="empty-tx"><div class="empty-icon">📊</div><div style="font-size:0.85rem">Nicio tranzacție în această lună</div></div>`;
   } else {
-    txList.innerHTML = [...monthTx].sort((a,b)=>b.date.localeCompare(a.date)).map(t => {
+    // All transactions sorted by date ascending to compute running balance
+    const allSorted = [...transactions].sort((a,b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+    // Compute running balance for each transaction
+    let running = soldInitial;
+    const balanceMap = {};
+    allSorted.forEach(t => {
+      running += t.type === 'income' ? t.amount : -t.amount;
+      balanceMap[t.id] = running;
+    });
+    // Display month transactions sorted desc
+    const sorted = [...monthTx].sort((a,b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+    txList.innerHTML = sorted.map(t => {
       const cat = getCat(t.type, t.category);
       const d = new Date(t.date+'T12:00:00');
       const dateStr = d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'});
+      const soldRamas = balanceMap[t.id];
+      const soldColor = soldRamas >= 0 ? '#4ade80' : '#f87171';
       return `<div class="tx-item">
         <div class="tx-icon" style="background:${cat.color}18">${cat.icon}</div>
         <div class="tx-info">
           <div class="tx-desc">${t.desc}</div>
           <div class="tx-meta">${cat.name} · ${dateStr}</div>
         </div>
-        <div class="tx-amount ${t.type}">${t.type==='income'?'+':'−'}${fmt(t.amount)}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+          <div class="tx-amount ${t.type}">${t.type==='income'?'+':'−'}${fmt(t.amount)}</div>
+          <div style="font-size:0.68rem;color:${soldColor}">sold: ${fmt(soldRamas)}</div>
+        </div>
         <button class="del-btn" onclick="deleteTransaction('${t.id}')">✕</button>
       </div>`;
     }).join('');
