@@ -1,0 +1,17 @@
+{
+  "name": "Buget Personal",
+  "short_name": "Buget",
+  "description": "Monitorizează veniturile și cheltuielile tale",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f4b0.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    }
+  ]
+}

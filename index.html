@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0f">
+<title>Buget Personal</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a28;
+    --border: #1e1e2e;
+    --border2: #2a2a3a;
+    --text: #f0ede8;
+    --muted: #555;
+    --accent: #e8c97a;
+    --income: #4ade80;
+    --expense: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 70px; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+  input, select, button { font-family: inherit; -webkit-appearance: none; }
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input::placeholder { color: #3a3a4a; }
+
+  /* Auth screen */
+  #authScreen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 32px 20px; text-align: center;
+  }
+  .auth-logo { font-family: 'Playfair Display', serif; font-size: 2.5rem; color: var(--accent); margin-bottom: 8px; }
+  .auth-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 48px; }
+  .google-btn {
+    display: flex; align-items: center; gap: 12px;
+    background: white; color: #333; border: none;
+    padding: 14px 28px; border-radius: 12px; cursor: pointer;
+    font-size: 1rem; font-weight: 600; font-family: inherit;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    transition: all 0.2s;
+  }
+  .google-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  .google-btn svg { width: 22px; height: 22px; }
+  .auth-note { color: #444; font-size: 0.8rem; margin-top: 24px; max-width: 280px; line-height: 1.5; }
+
+  /* App */
+  #app { display: none; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(180deg, #13131c, var(--bg));
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; max-width: 600px; margin: 0 auto; }
+  .logo { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: var(--accent); }
+  .logo span { color: var(--text); font-weight: 400; }
+  .month-nav { display: flex; align-items: center; gap: 8px; }
+  .nav-btn {
+    background: var(--surface2); border: 1px solid var(--border2);
+    color: var(--text); width: 32px; height: 32px; border-radius: 50%;
+    cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .nav-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .month-label { font-family: 'Playfair Display', serif; font-size: 0.9rem; min-width: 128px; text-align: center; }
+
+  /* Container */
+  .container { max-width: 600px; margin: 0 auto; padding: 16px 16px; }
+
+  /* Summary cards */
+  .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 12px;
+    border-top: 3px solid transparent;
+    animation: slideUp 0.3s ease;
+  }
+  .card.income { border-top-color: var(--income); }
+  .card.expense { border-top-color: var(--expense); }
+  .card.balance { border-top-color: var(--accent); }
+  .card-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 6px; }
+  .card-value { font-family: 'Playfair Display', serif; font-size: 0.95rem; font-weight: 700; line-height: 1.2; word-break: break-all; }
+  .card.income .card-value { color: var(--income); }
+  .card.expense .card-value { color: var(--expense); }
+  .card.balance .card-value { color: var(--accent); }
+  .card-sub { font-size: 0.62rem; color: #444; margin-top: 3px; }
+
+  /* Sections */
+  .section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; margin-bottom: 14px;
+    animation: slideUp 0.3s ease;
+  }
+  .section-header {
+    padding: 16px 18px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .section-title { font-family: 'Playfair Display', serif; color: var(--accent); font-size: 0.95rem; }
+  .section-body { padding: 18px; }
+
+  /* Chart */
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
+  .bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bars { display: flex; gap: 3px; align-items: flex-end; height: 72px; width: 100%; justify-content: center; }
+  .bar { flex: 1; max-width: 14px; border-radius: 3px 3px 0 0; min-height: 2px; transition: height 0.4s ease; }
+  .bar.inc { background: var(--income); }
+  .bar.exp { background: var(--expense); }
+  .bar.active { opacity: 1 !important; }
+  .bar.inactive { opacity: 0.35; }
+  .bar-label { font-size: 0.6rem; color: var(--muted); }
+  .bar-label.active { color: var(--accent); font-weight: 700; }
+  .chart-legend { display: flex; gap: 14px; margin-top: 10px; }
+  .legend-item { font-size: 0.68rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+
+  /* Categories */
+  .cat-item { margin-bottom: 13px; }
+  .cat-item:last-child { margin-bottom: 0; }
+  .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .cat-name { font-size: 0.82rem; display: flex; align-items: center; gap: 7px; }
+  .cat-amount { font-size: 0.82rem; font-weight: 600; }
+  .cat-bar { height: 5px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .cat-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .empty-cats { color: #444; text-align: center; padding: 20px 0; font-size: 0.85rem; }
+
+  /* Add form */
+  .type-toggle { display: flex; gap: 8px; margin-bottom: 18px; }
+  .type-btn {
+    flex: 1; padding: 11px; border: 2px solid var(--border2);
+    background: transparent; color: var(--muted);
+    border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 0.88rem;
+    transition: all 0.2s;
+  }
+  .type-btn.active.inc-btn { border-color: var(--income); background: rgba(74,222,128,0.08); color: var(--income); }
+  .type-btn.active.exp-btn { border-color: var(--expense); background: rgba(248,113,113,0.08); color: var(--expense); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+    color: var(--text); padding: 12px 14px; border-radius: 10px;
+    font-size: 0.92rem; outline: none; transition: border-color 0.2s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field select option { background: var(--surface2); }
+  .submit-btn {
+    width: 100%; padding: 14px; background: var(--accent); color: var(--bg);
+    border: none; border-radius: 10px; font-weight: 700; font-size: 0.95rem;
+    cursor: pointer; letter-spacing: 0.03em; margin-top: 4px;
+    transition: all 0.2s;
+  }
+  .submit-btn:hover { background: #f0d68a; transform: translateY(-1px); }
+  .submit-btn:active { transform: translateY(0); }
+
+  /* Transactions */
+  .tx-item {
+    display: flex; align-items: center; padding: 12px 18px;
+    border-bottom: 1px solid #0e0e1a; gap: 12px;
+    transition: background 0.15s;
+  }
+  .tx-item:last-child { border-bottom: none; }
+  .tx-item:hover { background: var(--surface2); }
+  .tx-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+  .tx-info { flex: 1; min-width: 0; }
+  .tx-desc { font-size: 0.88rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tx-meta { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+  .tx-amount { font-family: 'Playfair Display', serif; font-size: 0.9rem; font-weight: 700; flex-shrink: 0; }
+  .tx-amount.income { color: var(--income); }
+  .tx-amount.expense { color: var(--expense); }
+  .del-btn {
+    width: 26px; height: 26px; background: transparent; border: 1px solid var(--border2);
+    color: var(--muted); border-radius: 6px; cursor: pointer; font-size: 0.7rem;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    opacity: 0; transition: all 0.2s;
+  }
+  .tx-item:hover .del-btn { opacity: 1; }
+  .del-btn:hover { background: var(--expense); color: white; border-color: var(--expense); }
+  .empty-tx { padding: 50px 20px; text-align: center; color: #444; }
+  .empty-icon { font-size: 2.5rem; opacity: 0.25; margin-bottom: 12px; }
+
+  /* Bottom nav */
+  .tab-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #0d0d15; border-top: 1px solid var(--border);
+    display: flex; z-index: 200;
+  }
+  .tab-btn {
+    flex: 1; padding: 10px 0; background: transparent; border: none;
+    color: #444; cursor: pointer; display: flex; flex-direction: column;
+    align-items: center; gap: 3px; font-size: 0.65rem; font-weight: 500;
+    transition: color 0.2s; letter-spacing: 0.03em;
+  }
+  .tab-btn.active { color: var(--accent); }
+  .tab-icon { font-size: 1.25rem; }
+
+  /* User pill */
+  .user-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 4px 10px 4px 4px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .user-pill:hover { border-color: var(--expense); }
+  .user-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+  .user-name { font-size: 0.72rem; color: var(--muted); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 20px; right: 20px; z-index: 999;
+    padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 0.85rem;
+    animation: toastIn 0.25s ease; box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    pointer-events: none;
+  }
+  .toast.success { background: var(--income); color: var(--bg); }
+  .toast.error { background: var(--expense); color: white; }
+
+  /* Loading */
+  .loading-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; flex-direction: column; gap: 16px;
+  }
+  .spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border2);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* Tab panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 380px) {
+    .summary { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loadingScreen" class="loading-screen">
+  <div class="spinner"></div>
+  <div style="color:#555;font-size:0.85rem">Se conectează...</div>
+</div>
+
+<!-- Auth Screen -->
+<div id="authScreen" style="display:none">
+  <div class="auth-logo">💰 Buget</div>
+  <div style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#888;margin-bottom:4px">Personal</div>
+  <div class="auth-sub">Monitorizează veniturile și cheltuielile tale</div>
+  <button class="google-btn" onclick="signInWithGoogle()">
+    <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Continuă cu Google
+  </button>
+  <div class="auth-note">Datele tale sunt private și sincronizate între toate dispozitivele tale.</div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">💰 <span>Buget</span></div>
+      <div class="month-nav">
+        <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
+        <div class="month-label" id="monthLabel"></div>
+        <button class="nav-btn" onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="user-pill" onclick="signOut()" title="Deconectare">
+        <img class="user-avatar" id="userAvatar" src="" alt="">
+        <span class="user-name" id="userName"></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Overview tab -->
+    <div class="tab-panel active" id="tab-overview">
+      <div class="summary">
+        <div class="card income">
+          <div class="card-label">Venituri</div>
+          <div class="card-value" id="totalIncome">0 lei</div>
+          <div class="card-sub" id="incCount">0 intrări</div>
+        </div>
+        <div class="card expense">
+          <div class="card-label">Cheltuieli</div>
+          <div class="card-value" id="totalExpense">0 lei</div>
+          <div class="card-sub" id="expCount">0 intrări</div>
+        </div>
+        <div class="card balance">
+          <div class="card-label">Sold</div>
+          <div class="card-value" id="balance">0 lei</div>
+          <div class="card-sub" id="savingRate">0% economisit</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Ultimele 6 luni</span>
+        </div>
+        <div class="section-body">
+          <div class="bar-chart" id="barChart"></div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--income)"></span>Venituri</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--expense)"></span>Cheltuieli</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Cheltuieli pe categorii</span>
+        </div>
+        <div class="section-body" id="catBreakdown"></div>
+      </div>
+    </div>
+
+    <!-- Add tab -->
+    <div class="tab-panel" id="tab-add">
+      <div class="section" style="margin-top:0">
+        <div class="section-header"><span class="section-title">Adaugă tranzacție</span></div>
+        <div class="section-body">
+          <div class="type-toggle">
+            <button class="type-btn inc-btn" id="btnIncome" onclick="setType('income')">+ Venit</button>
+            <button class="type-btn exp-btn active" id="btnExpense" onclick="setType('expense')">− Cheltuială</button>
+          </div>
+          <div class="field">
+            <label>Descriere</label>
+            <input type="text" id="fDesc" placeholder="ex: Salariu, Chirie, Cumpărături...">
+          </div>
+          <div class="form-row">
+            <div class="field" style="margin-bottom:0">
+              <label>Sumă (lei)</label>
+              <input type="number" id="fAmount" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Data</label>
+              <input type="date" id="fDate">
+            </div>
+          </div>
+          <div class="field" style="margin-top:14px">
+            <label>Categorie</label>
+            <select id="fCategory"></select>
+          </div>
+          <button class="submit-btn" onclick="addTransaction()">Adaugă tranzacție</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- History tab -->
+    <div class="tab-panel" id="tab-history">
+      <div class="section" style="margin-top:0">
+        <div class="section-header">
+          <span class="section-title">Tranzacții</span>
+          <span id="txCount" style="font-size:0.75rem;color:var(--muted)"></span>
+        </div>
+        <div id="txList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('overview', this)">
+      <span class="tab-icon">📊</span>Sumar
+    </button>
+    <button class="tab-btn" onclick="switchTab('add', this)">
+      <span class="tab-icon">➕</span>Adaugă
+    </button>
+    <button class="tab-btn" onclick="switchTab('history', this)">
+      <span class="tab-icon">📋</span>Istoric
+    </button>
+  </nav>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// =============================================
+// 🔥 ÎNLOCUIEȘTE CU CONFIG-UL TĂU FIREBASE 🔥
+// =============================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBkfS9UCNhLK4SkDNvXLcjMNojmSSTD4rQ",
+  authDomain: "buget-personal.firebaseapp.com",
+  projectId: "buget-personal",
+  storageBucket: "buget-personal.firebasestorage.app",
+  messagingSenderId: "914132915548",
+  appId: "1:914132915548:web:039938dc3d4342d0365d99",
+  measurementId: "G-3JV642RXR7"
+};
+// =============================================
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const MONTHS = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
+const MONTHS_SHORT = ['Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec'];
+const CATEGORIES = {
+  income: [
+    { id:'salariu', name:'Salariu', icon:'💼', color:'#4ade80' },
+    { id:'freelance', name:'Freelance', icon:'💻', color:'#60a5fa' },
+    { id:'investitii', name:'Investiții', icon:'📈', color:'#fbbf24' },
+    { id:'alte_venituri', name:'Alte venituri', icon:'💰', color:'#c084fc' },
+  ],
+  expense: [
+    { id:'mancare', name:'Mâncare & Băcănie', icon:'🛒', color:'#f87171' },
+    { id:'chirie', name:'Chirie & Utilități', icon:'🏠', color:'#fb923c' },
+    { id:'transport', name:'Transport', icon:'🚗', color:'#facc15' },
+    { id:'sanatate', name:'Sănătate', icon:'💊', color:'#34d399' },
+    { id:'divertisment', name:'Divertisment', icon:'🎬', color:'#a78bfa' },
+    { id:'imbracaminte', name:'Îmbrăcăminte', icon:'👗', color:'#f472b6' },
+    { id:'educatie', name:'Educație', icon:'📚', color:'#38bdf8' },
+    { id:'restaurant', name:'Restaurant & Cafele', icon:'☕', color:'#e07b5f' },
+    { id:'economii', name:'Economii', icon:'🏦', color:'#4ade80' },
+    { id:'alte_chelt', name:'Altele', icon:'📦', color:'#94a3b8' },
+  ]
+};
+
+let transactions = [];
+let currentUser = null;
+let unsubscribe = null;
+let viewYear = new Date().getFullYear();
+let viewMonth = new Date().getMonth();
+let currentType = 'expense';
+
+const getCat = (type, id) => CATEGORIES[type]?.find(c => c.id === id) || { name: id, icon:'📦', color:'#94a3b8' };
+const fmt = n => n.toLocaleString('ro-RO', { minimumFractionDigits:0, maximumFractionDigits:2 }) + ' lei';
+const getMonthKey = (y, m) => `${y}-${String(m+1).padStart(2,'0')}`;
+
+function showToast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+
+// Auth
+onAuthStateChanged(auth, user => {
+  document.getElementById('loadingScreen').style.display = 'none';
+  if (user) {
+    currentUser = user;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('userAvatar').src = user.photoURL || '';
+    document.getElementById('userName').textContent = user.displayName?.split(' ')[0] || 'User';
+    subscribeToData();
+    initForm();
+    render();
+  } else {
+    currentUser = null;
+    if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+window.signInWithGoogle = async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  } catch (e) { showToast('Eroare la conectare!', 'error'); }
+};
+
+window.signOut = async () => {
+  if (confirm('Ești sigur că vrei să te deconectezi?')) {
+    await fbSignOut(auth);
+  }
+};
+
+function subscribeToData() {
+  if (unsubscribe) unsubscribe();
+  const ref = collection(db, 'users', currentUser.uid, 'transactions');
+  const q = query(ref, orderBy('date', 'desc'));
+  unsubscribe = onSnapshot(q, snap => {
+    transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  });
+}
+
+function initForm() {
+  document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
+  updateCatSelect();
+}
+
+function updateCatSelect() {
+  const sel = document.getElementById('fCategory');
+  sel.innerHTML = CATEGORIES[currentType].map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+}
+
+window.setType = (type) => {
+  currentType = type;
+  document.getElementById('btnIncome').classList.toggle('active', type === 'income');
+  document.getElementById('btnExpense').classList.toggle('active', type === 'expense');
+  updateCatSelect();
+};
+
+window.changeMonth = (dir) => {
+  viewMonth += dir;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+  render();
+};
+
+window.addTransaction = async () => {
+  const desc = document.getElementById('fDesc').value.trim();
+  const amount = parseFloat(document.getElementById('fAmount').value);
+  const date = document.getElementById('fDate').value;
+  const category = document.getElementById('fCategory').value;
+  if (!desc || !amount || amount <= 0 || !date) {
+    showToast('Completează toate câmpurile!', 'error'); return;
+  }
+  try {
+    await addDoc(collection(db, 'users', currentUser.uid, 'transactions'), {
+      type: currentType, desc, amount, category, date,
+      monthKey: date.substring(0, 7),
+      createdAt: Date.now()
+    });
+    document.getElementById('fDesc').value = '';
+    document.getElementById('fAmount').value = '';
+    const [y, m] = date.split('-').map(Number);
+    viewYear = y; viewMonth = m - 1;
+    switchTab('overview', document.querySelector('.tab-btn'));
+    showToast(currentType === 'income' ? '✓ Venit adăugat!' : '✓ Cheltuială adăugată!');
+  } catch (e) { showToast('Eroare la salvare!', 'error'); }
+};
+
+window.deleteTransaction = async (id) => {
+  try {
+    await deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', id));
+    showToast('Tranzacție ștearsă');
+  } catch (e) { showToast('Eroare!', 'error'); }
+};
+
+window.switchTab = (tab, btn) => {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (btn) btn.classList.add('active');
+  else document.querySelectorAll('.tab-btn')[0].classList.add('active');
+};
+
+function render() {
+  const key = getMonthKey(viewYear, viewMonth);
+  document.getElementById('monthLabel').textContent = `${MONTHS[viewMonth]} ${viewYear}`;
+
+  const monthTx = transactions.filter(t => t.monthKey === key);
+  const incomes = monthTx.filter(t => t.type === 'income');
+  const expenses = monthTx.filter(t => t.type === 'expense');
+  const totalInc = incomes.reduce((s,t) => s+t.amount, 0);
+  const totalExp = expenses.reduce((s,t) => s+t.amount, 0);
+  const bal = totalInc - totalExp;
+  const rate = totalInc > 0 ? Math.round((bal/totalInc)*100) : 0;
+
+  document.getElementById('totalIncome').textContent = fmt(totalInc);
+  document.getElementById('totalExpense').textContent = fmt(totalExp);
+  document.getElementById('balance').textContent = fmt(bal);
+  document.getElementById('incCount').textContent = `${incomes.length} intrări`;
+  document.getElementById('expCount').textContent = `${expenses.length} intrări`;
+  document.getElementById('savingRate').textContent = `${rate}% economisit`;
+
+  // Chart
+  const chart6 = Array.from({length:6}, (_,i) => {
+    let m = viewMonth-(5-i), y = viewYear;
+    while (m<0) { m+=12; y--; }
+    const mk = getMonthKey(y,m);
+    const tx = transactions.filter(t => t.monthKey===mk);
+    return {
+      label: MONTHS_SHORT[m],
+      inc: tx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0),
+      exp: tx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
+      active: mk===key
+    };
+  });
+  const chartMax = Math.max(...chart6.flatMap(c=>[c.inc,c.exp]),1);
+  document.getElementById('barChart').innerHTML = chart6.map(c => `
+    <div class="bar-group">
+      <div class="bars">
+        <div class="bar inc ${c.active?'active':'inactive'}" style="height:${Math.max(2,(c.inc/chartMax)*72)}px" title="${fmt(c.inc)}"></div>
+        <div class="bar exp ${c.active?'active':'inactive'}" style="height:${Math.max(2,(c.exp/chartMax)*72)}px" title="${fmt(c.exp)}"></div>
+      </div>
+      <div class="bar-label ${c.active?'active':''}">${c.label}</div>
+    </div>`).join('');
+
+  // Categories
+  const catTotals = {};
+  expenses.forEach(t => { catTotals[t.category] = (catTotals[t.category]||0)+t.amount; });
+  const sortedCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  const catEl = document.getElementById('catBreakdown');
+  if (sortedCats.length === 0) {
+    catEl.innerHTML = '<div class="empty-cats">Nicio cheltuială în această lună</div>';
+  } else {
+    catEl.innerHTML = sortedCats.map(([catId,amt]) => {
+      const cat = getCat('expense', catId);
+      const pct = Math.round((amt/totalExp)*100);
+      const barW = Math.round((amt/sortedCats[0][1])*100);
+      return `<div class="cat-item">
+        <div class="cat-header">
+          <span class="cat-name">${cat.icon} ${cat.name}</span>
+          <span class="cat-amount" style="color:${cat.color}">${fmt(amt)} <span style="color:#555;font-weight:400">(${pct}%)</span></span>
+        </div>
+        <div class="cat-bar"><div class="cat-fill" style="width:${barW}%;background:${cat.color}"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // Transactions
+  const txList = document.getElementById('txList');
+  document.getElementById('txCount').textContent = `${monthTx.length} înregistrări`;
+  if (monthTx.length === 0) {
+    txList.innerHTML = `<div class="empty-tx"><div class="empty-icon">📊</div><div style="font-size:0.85rem">Nicio tranzacție în această lună</div></div>`;
+  } else {
+    txList.innerHTML = [...monthTx].sort((a,b)=>b.date.localeCompare(a.date)).map(t => {
+      const cat = getCat(t.type, t.category);
+      const d = new Date(t.date+'T12:00:00');
+      const dateStr = d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'});
+      return `<div class="tx-item">
+        <div class="tx-icon" style="background:${cat.color}18">${cat.icon}</div>
+        <div class="tx-info">
+          <div class="tx-desc">${t.desc}</div>
+          <div class="tx-meta">${cat.name} · ${dateStr}</div>
+        </div>
+        <div class="tx-amount ${t.type}">${t.type==='income'?'+':'−'}${fmt(t.amount)}</div>
+        <button class="del-btn" onclick="deleteTransaction('${t.id}')">✕</button>
+      </div>`;
+    }).join('');
+  }
+}
+</script>
+</body>
+</html>
