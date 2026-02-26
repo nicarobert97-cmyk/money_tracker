@@ -162,29 +162,42 @@
 
   /* Transactions */
   .tx-item {
-    display: flex; align-items: center; padding: 12px 18px;
-    border-bottom: 1px solid #0e0e1a; gap: 12px;
+    display: grid;
+    grid-template-columns: 36px 1fr auto auto auto;
+    align-items: center; padding: 12px 18px;
+    border-bottom: 1px solid #0e0e1a; gap: 10px;
     transition: background 0.15s;
   }
   .tx-item:last-child { border-bottom: none; }
   .tx-item:hover { background: var(--surface2); }
-  .tx-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
-  .tx-info { flex: 1; min-width: 0; }
+  .tx-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+  .tx-info { min-width: 0; }
   .tx-desc { font-size: 0.88rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tx-meta { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
-  .tx-amount { font-family: 'Playfair Display', serif; font-size: 0.9rem; font-weight: 700; flex-shrink: 0; }
+  .tx-amount { font-family: 'Playfair Display', serif; font-size: 0.9rem; font-weight: 700; text-align: right; white-space: nowrap; }
   .tx-amount.income { color: var(--income); }
   .tx-amount.expense { color: var(--expense); }
+  .tx-sold {
+    font-family: 'Playfair Display', serif; font-size: 0.85rem; font-weight: 600;
+    text-align: right; white-space: nowrap; color: #94a3b8;
+    padding-left: 8px; border-left: 1px solid #1e1e2e; min-width: 80px;
+  }
   .del-btn {
     width: 26px; height: 26px; background: transparent; border: 1px solid var(--border2);
     color: var(--muted); border-radius: 6px; cursor: pointer; font-size: 0.7rem;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
     opacity: 0; transition: all 0.2s;
   }
   .tx-item:hover .del-btn { opacity: 1; }
   .del-btn:hover { background: var(--expense); color: white; border-color: var(--expense); }
   .empty-tx { padding: 50px 20px; text-align: center; color: #444; }
   .empty-icon { font-size: 2.5rem; opacity: 0.25; margin-bottom: 12px; }
+  /* Transactions header */
+  .tx-header-row {
+    display: grid; grid-template-columns: 36px 1fr auto auto auto;
+    padding: 8px 18px; gap: 10px; border-bottom: 1px solid #1e1e2e;
+    font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: #444;
+  }
 
   /* Bottom nav */
   .tab-nav {
@@ -699,22 +712,26 @@ function render() {
     });
     // Display month transactions sorted desc
     const sorted = [...monthTx].sort((a,b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
-    txList.innerHTML = sorted.map(t => {
+    const headerRow = `<div class="tx-header-row">
+      <div></div>
+      <div>Descriere</div>
+      <div style="text-align:right">Sumă</div>
+      <div style="text-align:right;padding-left:8px">Sold rămas</div>
+      <div></div>
+    </div>`;
+    txList.innerHTML = headerRow + sorted.map(t => {
       const cat = getCat(t.type, t.category);
       const d = new Date(t.date+'T12:00:00');
       const dateStr = d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'});
       const soldRamas = balanceMap[t.id];
-      const soldColor = soldRamas >= 0 ? '#4ade80' : '#f87171';
       return `<div class="tx-item">
         <div class="tx-icon" style="background:${cat.color}18">${cat.icon}</div>
         <div class="tx-info">
           <div class="tx-desc">${t.desc}</div>
           <div class="tx-meta">${cat.name} · ${dateStr}</div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
-          <div class="tx-amount ${t.type}">${t.type==='income'?'+':'−'}${fmt(t.amount)}</div>
-          <div style="font-size:0.68rem;color:${soldColor}">sold: ${fmt(soldRamas)}</div>
-        </div>
+        <div class="tx-amount ${t.type}">${t.type==='income'?'+':'−'}${fmt(t.amount)}</div>
+        <div class="tx-sold">${fmt(soldRamas)}</div>
         <button class="del-btn" onclick="deleteTransaction('${t.id}')">✕</button>
       </div>`;
     }).join('');
