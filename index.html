@@ -124,12 +124,37 @@
   /* Categories */
   .cat-item { margin-bottom: 13px; }
   .cat-item:last-child { margin-bottom: 0; }
-  .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; cursor: pointer; padding: 4px 0; border-radius: 8px; transition: background 0.15s; }
+  .cat-header:hover { background: rgba(255,255,255,0.03); }
   .cat-name { font-size: 0.82rem; display: flex; align-items: center; gap: 7px; }
-  .cat-amount { font-size: 0.82rem; font-weight: 600; }
+  .cat-amount { font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .cat-chevron { font-size: 0.65rem; color: #444; transition: transform 0.2s; }
+  .cat-chevron.open { transform: rotate(180deg); }
   .cat-bar { height: 5px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
   .cat-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
   .empty-cats { color: #444; text-align: center; padding: 20px 0; font-size: 0.85rem; }
+  /* Expandable tx list under category */
+  .cat-tx-list { display: none; margin-top: 8px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .cat-tx-list.open { display: block; animation: slideUp 0.2s ease; }
+  .cat-tx-mini { display: flex; align-items: center; padding: 9px 12px; gap: 10px; border-bottom: 1px solid #0e0e1a; font-size: 0.82rem; cursor: pointer; transition: background 0.15s; }
+  .cat-tx-mini:last-child { border-bottom: none; }
+  .cat-tx-mini:hover { background: var(--surface2); }
+  .cat-tx-mini-info { flex: 1; min-width: 0; }
+  .cat-tx-mini-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .cat-tx-mini-date { font-size: 0.68rem; color: var(--muted); }
+  .cat-tx-mini-amt { font-family: 'Playfair Display', serif; font-weight: 700; white-space: nowrap; }
+  /* Edit modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: flex-end; justify-content: center; animation: fadeIn 0.2s ease; }
+  .modal { background: #16161f; border: 1px solid var(--border2); border-radius: 20px 20px 0 0; padding: 24px 20px 36px; width: 100%; max-width: 600px; animation: slideUpModal 0.25s ease; }
+  .modal-title { font-family: 'Playfair Display', serif; color: var(--accent); font-size: 1rem; margin-bottom: 4px; }
+  .modal-sub { font-size: 0.78rem; color: var(--muted); margin-bottom: 20px; }
+  .modal-cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 60vh; overflow-y: auto; }
+  .modal-cat-btn { display: flex; align-items: center; gap: 9px; padding: 11px 12px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 10px; cursor: pointer; font-size: 0.82rem; color: var(--text); text-align: left; transition: all 0.15s; }
+  .modal-cat-btn:hover { border-color: var(--accent); }
+  .modal-cat-btn.selected { border-color: var(--accent); background: rgba(232,201,122,0.1); color: var(--accent); }
+  .modal-close { width: 100%; padding: 12px; background: transparent; border: 1px solid var(--border2); border-radius: 10px; color: var(--muted); cursor: pointer; font-size: 0.88rem; margin-top: 12px; }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  @keyframes slideUpModal { from { transform: translateY(60px); opacity:0; } to { transform: translateY(0); opacity:1; } }
 
   /* Add form */
   .type-toggle { display: flex; gap: 8px; margin-bottom: 18px; }
@@ -458,11 +483,13 @@ const CATEGORIES = {
     { id:'transport', name:'Transport', icon:'🚗', color:'#facc15' },
     { id:'sanatate', name:'Sănătate', icon:'💊', color:'#34d399' },
     { id:'divertisment', name:'Divertisment', icon:'🎬', color:'#a78bfa' },
-    { id:'imbracaminte', name:'Îmbrăcăminte', icon:'👗', color:'#f472b6' },
+    { id:'imbracaminte', name:'Îmbrăcăminte', icon:'👕', color:'#f472b6' },
     { id:'educatie', name:'Educație', icon:'📚', color:'#38bdf8' },
     { id:'restaurant', name:'Restaurant & Cafele', icon:'☕', color:'#e07b5f' },
     { id:'investitii', name:'Investiții', icon:'📊', color:'#4ade80' },
     { id:'rate', name:'Rate', icon:'🏦', color:'#f87171' },
+    { id:'vacante', name:'Vacanțe', icon:'✈️', color:'#38bdf8' },
+    { id:'sport', name:'Sport', icon:'🏋️', color:'#fb923c' },
     { id:'alte_chelt', name:'Altele', icon:'📦', color:'#94a3b8' },
   ]
 };
@@ -609,6 +636,53 @@ window.saveSoldInitial = async (val) => {
   } catch(e) {}
 };
 
+// Toggle category expand in summary
+window.toggleCat = (id) => {
+  const list = document.getElementById('catlist-' + id);
+  const chev = document.getElementById('chev-' + id);
+  if (!list) return;
+  list.classList.toggle('open');
+  if (chev) chev.classList.toggle('open');
+};
+
+// Open edit modal for changing category of a transaction
+window.openEditCat = (txId, txType) => {
+  // Remove existing modal
+  const existing = document.getElementById('editModal');
+  if (existing) existing.remove();
+
+  const cats = CATEGORIES[txType];
+  const tx = transactions.find(t => t.id === txId);
+  if (!tx) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'editModal';
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-title">Schimbă categoria</div>
+      <div class="modal-sub">${tx.desc} · ${tx.type === 'income' ? '+' : '−'}${tx.amount.toLocaleString('ro-RO')} lei</div>
+      <div class="modal-cat-grid">
+        ${cats.map(c => `
+          <button class="modal-cat-btn ${tx.category === c.id ? 'selected' : ''}" onclick="saveCatChange('${txId}','${c.id}')">
+            <span>${c.icon}</span> ${c.name}
+          </button>`).join('')}
+      </div>
+      <button class="modal-close" onclick="document.getElementById('editModal').remove()">Anulează</button>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+};
+
+window.saveCatChange = async (txId, newCat) => {
+  try {
+    const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    await updateDoc(doc(db, 'users', currentUser.uid, 'transactions', txId), { category: newCat });
+    document.getElementById('editModal')?.remove();
+    showToast('✓ Categorie actualizată!');
+  } catch(e) { showToast('Eroare!', 'error'); }
+};
+
 function render() {
   const key = getMonthKey(viewYear, viewMonth);
   document.getElementById('monthLabel').textContent = `${MONTHS[viewMonth]} ${viewYear}`;
@@ -651,7 +725,7 @@ function render() {
       <div class="bar-label ${c.active?'active':''}">${c.label}</div>
     </div>`).join('');
 
-  // Expense categories
+  // Expense categories (expandable)
   const catTotals = {};
   expenses.forEach(t => { catTotals[t.category] = (catTotals[t.category]||0)+t.amount; });
   const sortedCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
@@ -663,17 +737,32 @@ function render() {
       const cat = getCat('expense', catId);
       const pct = Math.round((amt/totalExp)*100);
       const barW = Math.round((amt/sortedCats[0][1])*100);
+      const catTxs = expenses.filter(t => t.category === catId).sort((a,b) => b.date.localeCompare(a.date));
+      const uid = 'exp-' + catId;
       return `<div class="cat-item">
-        <div class="cat-header">
+        <div class="cat-header" onclick="toggleCat('${uid}')">
           <span class="cat-name">${cat.icon} ${cat.name}</span>
-          <span class="cat-amount" style="color:${cat.color}">${fmt(amt)} <span style="color:#555;font-weight:400">(${pct}%)</span></span>
+          <span class="cat-amount" style="color:${cat.color}">${fmt(amt)} <span style="color:#555;font-weight:400">(${pct}%)</span> <span class="cat-chevron" id="chev-${uid}">▼</span></span>
         </div>
         <div class="cat-bar"><div class="cat-fill" style="width:${barW}%;background:${cat.color}"></div></div>
+        <div class="cat-tx-list" id="catlist-${uid}">
+          ${catTxs.map(t => {
+            const d = new Date(t.date+'T12:00:00');
+            const ds = d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'});
+            return `<div class="cat-tx-mini" onclick="openEditCat('${t.id}','expense')">
+              <div class="cat-tx-mini-info">
+                <div class="cat-tx-mini-desc">${t.desc}</div>
+                <div class="cat-tx-mini-date">${ds} · apasă pentru a schimba categoria</div>
+              </div>
+              <div class="cat-tx-mini-amt" style="color:var(--expense)">−${fmt(t.amount)}</div>
+            </div>`;
+          }).join('')}
+        </div>
       </div>`;
     }).join('');
   }
 
-  // Income categories
+  // Income categories (expandable)
   const incTotals = {};
   incomes.forEach(t => { incTotals[t.category] = (incTotals[t.category]||0)+t.amount; });
   const sortedIncCats = Object.entries(incTotals).sort((a,b)=>b[1]-a[1]);
@@ -685,12 +774,27 @@ function render() {
       const cat = getCat('income', catId);
       const pct = Math.round((amt/totalInc)*100);
       const barW = Math.round((amt/sortedIncCats[0][1])*100);
+      const catTxs = incomes.filter(t => t.category === catId).sort((a,b) => b.date.localeCompare(a.date));
+      const uid = 'inc-' + catId;
       return `<div class="cat-item">
-        <div class="cat-header">
+        <div class="cat-header" onclick="toggleCat('${uid}')">
           <span class="cat-name">${cat.icon} ${cat.name}</span>
-          <span class="cat-amount" style="color:${cat.color}">${fmt(amt)} <span style="color:#555;font-weight:400">(${pct}%)</span></span>
+          <span class="cat-amount" style="color:${cat.color}">${fmt(amt)} <span style="color:#555;font-weight:400">(${pct}%)</span> <span class="cat-chevron" id="chev-${uid}">▼</span></span>
         </div>
         <div class="cat-bar"><div class="cat-fill" style="width:${barW}%;background:${cat.color}"></div></div>
+        <div class="cat-tx-list" id="catlist-${uid}">
+          ${catTxs.map(t => {
+            const d = new Date(t.date+'T12:00:00');
+            const ds = d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'});
+            return `<div class="cat-tx-mini" onclick="openEditCat('${t.id}','income')">
+              <div class="cat-tx-mini-info">
+                <div class="cat-tx-mini-desc">${t.desc}</div>
+                <div class="cat-tx-mini-date">${ds} · apasă pentru a schimba categoria</div>
+              </div>
+              <div class="cat-tx-mini-amt" style="color:var(--income)">+${fmt(t.amount)}</div>
+            </div>`;
+          }).join('')}
+        </div>
       </div>`;
     }).join('');
   }
@@ -724,7 +828,7 @@ function render() {
       const d = new Date(t.date+'T12:00:00');
       const dateStr = d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'});
       const soldRamas = balanceMap[t.id];
-      return `<div class="tx-item">
+      return `<div class="tx-item" onclick="openEditCat('${t.id}','${t.type}')" style="cursor:pointer">
         <div class="tx-icon" style="background:${cat.color}18">${cat.icon}</div>
         <div class="tx-info">
           <div class="tx-desc">${t.desc}</div>
@@ -732,7 +836,7 @@ function render() {
         </div>
         <div class="tx-amount ${t.type}">${t.type==='income'?'+':'−'}${fmt(t.amount)}</div>
         <div class="tx-sold">${fmt(soldRamas)}</div>
-        <button class="del-btn" onclick="deleteTransaction('${t.id}')">✕</button>
+        <button class="del-btn" onclick="event.stopPropagation();deleteTransaction('${t.id}')">✕</button>
       </div>`;
     }).join('');
   }
